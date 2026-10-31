@@ -46,4 +46,12 @@ public class ApiResponse<T> {
                 .data(null)
                 .build();
     }
+
+    public static <T> ApiResponse<T> error(String message, String errorCode) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message("[" + errorCode + "] " + message)
+                .data(null)
+                .build();
+    }
 }
