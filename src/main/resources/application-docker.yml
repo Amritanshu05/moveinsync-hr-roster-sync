@@ -1,0 +1,9 @@
+spring:
+  config:
+    activate:
+      on-profile: docker
+
+  datasource:
+    url: jdbc:postgresql://postgres:5432/moveinsync_roster
+    username: postgres
+    password: postgres

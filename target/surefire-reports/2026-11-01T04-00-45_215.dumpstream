@@ -1,0 +1,5 @@
+# Created at 2026-11-01T04:00:45.709
+Boot Manifest-JAR contains absolute paths in classpath 'H:\Projects\MOveinsync\moveinsync-hr-roster-sync\target\test-classes'
+Hint: <argLine>-Djdk.net.URLClassPath.disableClassPathURLCheck=true</argLine>
+'other' has different root
+

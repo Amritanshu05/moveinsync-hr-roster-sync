@@ -1,0 +1,29 @@
+spring:
+  config:
+    activate:
+      on-profile: test
+
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: true
+
+  flyway:
+    enabled: true
+
+moveinsync:
+  jwt:
+    secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+    expiration-ms: 3600000
+  reconciliation:
+    safety-brake-threshold: 0.30
+    streaming-batch-size: 500
+  outbox:
+    polling-interval-ms: 500
+    batch-size: 50
+    max-retry-count: 3
