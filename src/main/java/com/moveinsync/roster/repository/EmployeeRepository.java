@@ -5,6 +5,7 @@ import com.moveinsync.roster.domain.enums.EmployeeStatus;
 import com.moveinsync.roster.repository.projection.EmployeeHashProjection;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -19,7 +20,7 @@ import java.util.UUID;
 import java.util.stream.Stream;
 
 @Repository
-public interface EmployeeRepository extends JpaRepository<Employee, UUID> {
+public interface EmployeeRepository extends JpaRepository<Employee, UUID>, JpaSpecificationExecutor<Employee> {
 
     Optional<Employee> findByTenantIdAndEmployeeCode(UUID tenantId, String employeeCode);
 
