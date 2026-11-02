@@ -131,7 +131,10 @@ public class ReconciliationController {
     public ResponseEntity<ApiResponse<ReconciliationJobResponseDto>> approveJob(
             @PathVariable String jobReference,
             @Valid @RequestBody ReconciliationApprovalDto approval,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            java.security.Principal principal) {
+
+        String operatorUsername = resolveOperatorUsername(userDetails, principal);
 
         // Force action to APPROVE regardless of body value — endpoint semantics are explicit
         ReconciliationApprovalDto approveAction = ReconciliationApprovalDto.builder()
@@ -140,7 +143,7 @@ public class ReconciliationController {
                 .build();
 
         ReconciliationJobResponseDto result = reconciliationService.processApproval(
-                jobReference, approveAction, userDetails.getUsername());
+                jobReference, approveAction, operatorUsername);
         return ResponseEntity.ok(ApiResponse.ok(
                 "Reconciliation approved. Missing employees will be deactivated.", result));
     }
@@ -153,7 +156,10 @@ public class ReconciliationController {
     public ResponseEntity<ApiResponse<ReconciliationJobResponseDto>> rejectJob(
             @PathVariable String jobReference,
             @Valid @RequestBody ReconciliationApprovalDto approval,
-            @AuthenticationPrincipal UserDetails userDetails) {
+            @AuthenticationPrincipal UserDetails userDetails,
+            java.security.Principal principal) {
+
+        String operatorUsername = resolveOperatorUsername(userDetails, principal);
 
         ReconciliationApprovalDto rejectAction = ReconciliationApprovalDto.builder()
                 .action("REJECT")
@@ -161,8 +167,22 @@ public class ReconciliationController {
                 .build();
 
         ReconciliationJobResponseDto result = reconciliationService.processApproval(
-                jobReference, rejectAction, userDetails.getUsername());
+                jobReference, rejectAction, operatorUsername);
         return ResponseEntity.ok(ApiResponse.ok(
                 "Reconciliation rejected. No employees were deactivated.", result));
+    }
+
+    private String resolveOperatorUsername(UserDetails userDetails, java.security.Principal principal) {
+        if (userDetails != null && userDetails.getUsername() != null && !userDetails.getUsername().isBlank()) {
+            return userDetails.getUsername();
+        }
+        if (principal != null && principal.getName() != null && !principal.getName().isBlank()) {
+            return principal.getName();
+        }
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getName() != null && !auth.getName().isBlank()) {
+            return auth.getName();
+        }
+        throw new com.moveinsync.roster.exception.UnauthorizedException("Authenticated operator identity could not be verified");
     }
 }

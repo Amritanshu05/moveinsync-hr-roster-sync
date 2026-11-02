@@ -113,6 +113,9 @@ class EventIngestionServiceTest {
 
         lenient().when(cacheManager.getCache(anyString())).thenReturn(cache);
 
+        lenient().when(idempotencyRecordRepository.insertIfNotExists(any(), any(), any(), anyLong(), any(), any()))
+                .thenReturn(1);
+
         ingestionService = new EventIngestionService(
                 employeeRepository,
                 employeeEventRepository,

@@ -423,28 +423,84 @@ public class ReconciliationService {
     /**
      * Batch deactivates employees who are in the DB but missing from the nightly export.
      * Processes in configurable chunks to avoid overwhelming the DB.
+     * Creates EMPLOYEE_DEACTIVATE outbox events in the same transaction and cancels future bookings.
      */
     private void batchDeactivateMissing(UUID tenantId, Set<String> missingCodes, String reason) {
+        if (missingCodes == null || missingCodes.isEmpty()) {
+            return;
+        }
+
         List<String> codeList = new ArrayList<>(missingCodes);
+        Instant now = Instant.now();
 
         for (int i = 0; i < codeList.size(); i += streamingBatchSize) {
             int end = Math.min(i + streamingBatchSize, codeList.size());
             List<String> batch = codeList.subList(i, end);
 
+            // Fetch only currently ACTIVE employees in this batch to prevent duplicate deactivation events
+            List<Employee> activeEmployees = employeeRepository
+                    .findByTenantIdAndEmployeeCodeInAndStatus(tenantId, batch, EmployeeStatus.ACTIVE);
+
+            if (activeEmployees.isEmpty()) {
+                continue;
+            }
+
+            List<String> activeCodes = activeEmployees.stream()
+                    .map(Employee::getEmployeeCode)
+                    .toList();
+
+            // Perform bulk update only on active employees
             employeeRepository.updateStatusForEmployeeCodes(
-                    tenantId, batch, EmployeeStatus.INACTIVE, Instant.now());
+                    tenantId, activeCodes, EmployeeStatus.INACTIVE, now);
 
-            log.info("Batch deactivated {} employees for tenant {} (batch {}/{})",
-                    batch.size(), tenantId, (i / streamingBatchSize) + 1,
+            // Create outbox events for all newly deactivated employees in the same transaction
+            List<OutboxEvent> outboxEvents = new ArrayList<>();
+            for (Employee emp : activeEmployees) {
+                try {
+                    Map<String, Object> payloadMap = Map.of(
+                            "employeeCode", emp.getEmployeeCode(),
+                            "fullName", emp.getFullName(),
+                            "officeCode", emp.getOfficeCode(),
+                            "shiftCode", emp.getShiftCode(),
+                            "status", EmployeeStatus.INACTIVE.name(),
+                            "sourceVersion", emp.getSourceVersion() + 1,
+                            "timestamp", now.toString(),
+                            "reason", reason
+                    );
+
+                    OutboxEvent outboxEvent = OutboxEvent.builder()
+                            .tenantId(tenantId)
+                            .aggregateType("EMPLOYEE")
+                            .aggregateId(emp.getEmployeeCode())
+                            .eventType("EMPLOYEE_DEACTIVATE")
+                            .payload(objectMapper.writeValueAsString(payloadMap))
+                            .status(OutboxStatus.PENDING)
+                            .retryCount(0)
+                            .nextRetryAt(now)
+                            .build();
+
+                    outboxEvents.add(outboxEvent);
+                } catch (Exception ex) {
+                    log.error("Failed to build outbox event for deactivated employee {}: {}",
+                            emp.getEmployeeCode(), ex.getMessage(), ex);
+                }
+            }
+
+            if (!outboxEvents.isEmpty()) {
+                outboxEventRepository.saveAll(outboxEvents);
+            }
+
+            log.info("Batch deactivated {} employees and created {} outbox events for tenant {} (batch {}/{})",
+                    activeCodes.size(), outboxEvents.size(), tenantId, (i / streamingBatchSize) + 1,
                     (int) Math.ceil((double) codeList.size() / streamingBatchSize));
-        }
 
-        // Cancel future bookings for deactivated employees
-        for (String empCode : missingCodes) {
-            try {
-                bookingService.cancelFutureBookingsAndFreeSeats(tenantId, empCode, reason);
-            } catch (Exception ex) {
-                log.warn("Failed to cancel bookings for deactivated employee {}: {}", empCode, ex.getMessage());
+            // Cancel future cab bookings and free reserved seats for deactivated employees
+            for (String empCode : activeCodes) {
+                try {
+                    bookingService.cancelFutureBookingsAndFreeSeats(tenantId, empCode, reason);
+                } catch (Exception ex) {
+                    log.warn("Failed to cancel bookings for deactivated employee {}: {}", empCode, ex.getMessage());
+                }
             }
         }
     }

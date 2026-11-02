@@ -108,7 +108,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     @DisplayName("Should increment retry count and set PENDING on publish failure")
-    void shouldIncrementRetryCountOnFailure() {
+    void shouldIncrementRetryCountOnFailure() throws Exception {
         OutboxEvent event = pendingEvent("EMPLOYEE_UPDATED");
         event.setRetryCount(0);
 
@@ -138,7 +138,7 @@ class OutboxPublisherServiceTest {
 
     @Test
     @DisplayName("Should move event to DEAD_LETTER when max retry count is exhausted")
-    void shouldMoveEventToDeadLetterAfterMaxRetries() {
+    void shouldMoveEventToDeadLetterAfterMaxRetries() throws Exception {
         OutboxEvent event = pendingEvent("EMPLOYEE_DEACTIVATE");
         event.setRetryCount(4); // one more failure = 5 = maxRetryCount
 

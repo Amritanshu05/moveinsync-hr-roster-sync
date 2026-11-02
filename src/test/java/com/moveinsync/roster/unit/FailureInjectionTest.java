@@ -112,7 +112,7 @@ class FailureInjectionTest {
 
     @Test
     @DisplayName("Should leave event PENDING with incremented retry count when publish throws")
-    void shouldRemainPendingWithIncrementedRetryWhenPublishFails() {
+    void shouldRemainPendingWithIncrementedRetryWhenPublishFails() throws Exception {
         OutboxEvent event = pendingEvent("EMPLOYEE_UPDATED", 0);
 
         OutboxPublisherService spyService = spy(publisherService);
@@ -144,7 +144,7 @@ class FailureInjectionTest {
 
     @Test
     @DisplayName("Should exhaust retries and move event to DEAD_LETTER after maxRetryCount failures")
-    void shouldMoveToDeadLetterAfterRetryExhaustion() {
+    void shouldMoveToDeadLetterAfterRetryExhaustion() throws Exception {
         // Already attempted 2 times; one more failure (retry count = 3 = maxRetryCount) → DEAD_LETTER
         OutboxEvent event = pendingEvent("EMPLOYEE_DEACTIVATE", 2);
 

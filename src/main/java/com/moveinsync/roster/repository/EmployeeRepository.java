@@ -48,4 +48,6 @@ public interface EmployeeRepository extends JpaRepository<Employee, UUID>, JpaSp
                                      @Param("employeeCodes") Collection<String> employeeCodes,
                                      @Param("newStatus") EmployeeStatus newStatus,
                                      @Param("now") Instant now);
+
+    List<Employee> findByTenantIdAndEmployeeCodeInAndStatus(UUID tenantId, Collection<String> employeeCodes, EmployeeStatus status);
 }

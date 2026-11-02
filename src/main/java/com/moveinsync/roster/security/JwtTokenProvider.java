@@ -72,6 +72,11 @@ public class JwtTokenProvider {
         return getClaimsFromToken(token).get("tenantCode", String.class);
     }
 
+    public UUID getUserIdFromToken(String token) {
+        String userIdStr = getClaimsFromToken(token).get("userId", String.class);
+        return userIdStr != null ? UUID.fromString(userIdStr) : null;
+    }
+
     public String getRoleFromToken(String token) {
         return getClaimsFromToken(token).get("role", String.class);
     }

@@ -180,6 +180,20 @@ public class EventIngestionService {
                         .build();
             }
 
+            // Atomic reservation for concurrent arrivals to prevent DataIntegrityViolationException
+            int inserted = idempotencyRecordRepository.insertIfNotExists(
+                    tenantId, idempotencyKey, employeeCode, incomingVersion, requestHash, "IN_PROGRESS");
+            if (inserted == 0) {
+                eventsDuplicateCounter.increment();
+                log.info("Concurrent duplicate event detected via atomic constraint for key: {}. Handled as idempotent no-op.", idempotencyKey);
+                saveEmployeeEventAudit(tenantId, event, rawPayload, ProcessingOutcome.DUPLICATE_NO_OP, null);
+                return RecordResultDto.builder()
+                        .employeeCode(employeeCode)
+                        .outcome(ProcessingOutcome.DUPLICATE_NO_OP)
+                        .appliedVersion(incomingVersion)
+                        .build();
+            }
+
             // 2. Pessimistic Row Lock for Concurrent Ordering Serialization
             Optional<Employee> employeeOpt = employeeRepository
                     .findForUpdateByTenantIdAndEmployeeCode(tenantId, employeeCode);
@@ -311,15 +325,18 @@ public class EventIngestionService {
     }
 
     private void recordIdempotency(UUID tenantId, String key, String employeeCode, long version, String hash, String status) {
-        IdempotencyRecord record = IdempotencyRecord.builder()
-                .tenantId(tenantId)
-                .idempotencyKey(key)
-                .targetEntityId(employeeCode)
-                .sourceVersion(version)
-                .requestHash(hash)
-                .responseStatus(status)
-                .build();
-        idempotencyRecordRepository.save(record);
+        int updated = idempotencyRecordRepository.updateResponseStatus(tenantId, key, status);
+        if (updated == 0) {
+            IdempotencyRecord record = IdempotencyRecord.builder()
+                    .tenantId(tenantId)
+                    .idempotencyKey(key)
+                    .targetEntityId(employeeCode)
+                    .sourceVersion(version)
+                    .requestHash(hash)
+                    .responseStatus(status)
+                    .build();
+            idempotencyRecordRepository.save(record);
+        }
     }
 
     private void saveEmployeeEventAudit(UUID tenantId, EmployeeEventDto event, String rawPayload,

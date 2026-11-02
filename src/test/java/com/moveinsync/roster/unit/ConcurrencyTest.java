@@ -102,6 +102,8 @@ class ConcurrencyTest {
                 .thenReturn(Set.of("BLR_ECOSPACE"));
         lenient().when(cacheManager.getCache(anyString())).thenReturn(cache);
         lenient().when(employeeEventRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+        lenient().when(idempotencyRecordRepository.insertIfNotExists(any(), any(), any(), anyLong(), any(), any()))
+                .thenReturn(1);
 
         ingestionService = new EventIngestionService(
                 employeeRepository, employeeEventRepository, idempotencyRecordRepository,
@@ -144,6 +146,10 @@ class ConcurrencyTest {
                             .responseStatus("APPLIED")
                             .build());
                 });
+
+        AtomicInteger atomicInsertCount = new AtomicInteger(0);
+        when(idempotencyRecordRepository.insertIfNotExists(eq(tenantId), eq(idempotencyKey), eq(empCode), eq(version), any(), any()))
+                .thenAnswer(inv -> atomicInsertCount.getAndIncrement() == 0 ? 1 : 0);
 
         // For the one thread that passes idempotency: new employee
         when(employeeRepository.findForUpdateByTenantIdAndEmployeeCode(tenantId, empCode))
